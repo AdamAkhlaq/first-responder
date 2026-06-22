@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "first-responder"
+version = "0.1.0"
+description = "Autonomous agent that diagnoses production incidents from logs, metrics, and traces, evaluated against fault-injected scenarios with known ground truth."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Adam Akhlaq", email = "adam.akhlaq21@gmail.com" }]
+dependencies = [
+    "pydantic>=2.0",
+    "typer>=0.12",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+
+[project.urls]
+Repository = "https://github.com/adamakhlaq/first-responder"
+
+[project.scripts]
+first-responder = "first_responder.cli:app"
+
+[tool.ruff]
+line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["eval", "tests"]
