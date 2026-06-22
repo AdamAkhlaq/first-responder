@@ -40,14 +40,14 @@ Deterministic work — metric aggregation, timestamp alignment, trace walking, r
        └──────────────────────────────────────────────────┘
 ```
 
-| Component    | Responsibility                                                                                                                                |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `agent/`     | The reason–act loop, versioned system prompt, and the `Diagnosis` schema. Imports nothing from `simulator/`.                                  |
-| `tools/`     | The sole agent↔world contract. One responsibility per tool; model-shaped return granularity; informative errors the agent can adapt to.       |
-| `simulator/` | Scenario definitions and the fault→telemetry renderer. `activate()` emits agent-visible signal; `ground_truth()` emits the hidden answer key. |
-| `eval/`      | Scores a `Diagnosis` against ground truth; the only caller of `ground_truth()`. Doubles as the per-run audit trail.                           |
+| Component                    | Responsibility                                                                                                                                |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `first_responder/agent/`     | The reason–act loop, versioned system prompt, and the `Diagnosis` schema. Imports nothing from `first_responder/simulator/`.                  |
+| `first_responder/tools/`     | The sole agent↔world contract. One responsibility per tool; model-shaped return granularity; informative errors the agent can adapt to.       |
+| `first_responder/simulator/` | Scenario definitions and the fault→telemetry renderer. `activate()` emits agent-visible signal; `ground_truth()` emits the hidden answer key. |
+| `first_responder/eval/`      | Scores a `Diagnosis` against ground truth; the only caller of `ground_truth()`. Doubles as the per-run audit trail.                           |
 
-`agent/` and `simulator/` never reference each other — they meet only at `tools/`. That seam is both the integrity boundary (the agent cannot reach the answer key) and the extensibility boundary (swap the backend, the agent is untouched).
+The agent and simulator packages never reference each other — they meet only at the tools layer. That seam is both the integrity boundary (the agent cannot reach the answer key) and the extensibility boundary (swap the backend, the agent is untouched).
 
 ## Tool contract
 
@@ -129,12 +129,20 @@ Telemetry is rendered programmatically from the fault model, so signal stays int
 
 ```
 first-responder/
-├── agent/         loop.py · prompts/ · schema.py
-├── tools/         logs.py · metrics.py · traces.py · deploys.py · runbooks.py
-├── simulator/     scenario.py · telemetry.py · store.py · scenarios/
-├── eval/          scorer.py · report.py
-├── web/           run viewer
-└── docs/          ARCHITECTURE.md · adr/
+├── README.md
+├── ARCHITECTURE.md
+├── LICENSE
+├── pyproject.toml
+├── docs/
+│   └── adr/                  architecture decision records
+└── first_responder/
+    ├── __init__.py
+    ├── cli.py                `first-responder` entry point
+    ├── agent/                loop.py · prompts/ · schema.py
+    ├── tools/                logs.py · metrics.py · traces.py · deploys.py · runbooks.py
+    ├── simulator/            scenario.py · telemetry.py · store.py · scenarios/
+    ├── eval/                 scorer.py · report.py
+    └── web/                  run viewer
 ```
 
 ## Quickstart
