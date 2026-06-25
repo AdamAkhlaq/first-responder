@@ -32,5 +32,36 @@ first-responder = "first_responder.cli:app"
 [tool.ruff]
 line-length = 100
 
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+    "C4",  # flake8-comprehensions
+    "RUF", # ruff-specific rules
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["first_responder"]
+
+[tool.ruff.lint.flake8-bugbear]
+# typer uses callables (Option/Argument) as default values by design.
+extend-immutable-calls = ["typer.Option", "typer.Argument"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["first_responder"]
+plugins = ["pydantic.mypy"]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_return_any = true
+no_implicit_optional = true
+
 [tool.pytest.ini_options]
-testpaths = ["eval", "tests"]
+testpaths = ["tests"]
