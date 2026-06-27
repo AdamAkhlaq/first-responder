@@ -48,8 +48,11 @@ class _FakeScenario(Scenario):
 
 @pytest.fixture(autouse=True)
 def _isolate_registry() -> Iterator[None]:
-    # Snapshot and restore the module-global registry so tests don't leak state.
+    # Run each test against an empty registry, then restore the original — so a
+    # self-registering scenario imported elsewhere can't perturb these
+    # order-sensitive assertions, and these tests don't leak their fakes either.
     saved = dict(scenario_module._REGISTRY)
+    scenario_module._REGISTRY.clear()
     try:
         yield
     finally:

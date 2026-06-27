@@ -124,6 +124,54 @@ def render_metric_series(
     )
 
 
+def render_flat_then_spike(
+    rng: random.Random,
+    *,
+    service: str,
+    metric: str,
+    unit: str,
+    baseline: float,
+    baseline_window: TimeRange,
+    anomaly_window: TimeRange,
+    spike: float,
+    tail_ratio: float = 1.25,
+    jitter_fraction: float = 0.05,
+) -> list[MetricSeries]:
+    """Render a metric flat at baseline over one window, then spiked over the next.
+
+    Returns two summarised series — a healthy ``baseline_window`` (``spike`` 1.0) and
+    the ``anomaly_window`` scaled by ``spike``. This is the canonical sharp-onset
+    shape shared by scenarios whose symptom is a metric jump: the agent reads the
+    jump by comparing the two windows, and the anomaly window's start is the onset
+    timestamp it correlates against a deploy or a load change. The windows are
+    usually adjacent (the anomaly begins where the baseline ends) so they tile.
+    """
+    return [
+        render_metric_series(
+            rng,
+            service=service,
+            metric=metric,
+            unit=unit,
+            baseline=baseline,
+            anomaly_window=baseline_window,
+            spike=1.0,
+            tail_ratio=tail_ratio,
+            jitter_fraction=jitter_fraction,
+        ),
+        render_metric_series(
+            rng,
+            service=service,
+            metric=metric,
+            unit=unit,
+            baseline=baseline,
+            anomaly_window=anomaly_window,
+            spike=spike,
+            tail_ratio=tail_ratio,
+            jitter_fraction=jitter_fraction,
+        ),
+    ]
+
+
 def render_trace_chain(
     rng: random.Random,
     *,

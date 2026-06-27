@@ -10,6 +10,7 @@ from __future__ import annotations
 from first_responder.schema.time import TimeRange
 from first_responder.simulator.render import (
     jitter,
+    render_flat_then_spike,
     render_log_stream,
     render_metric_series,
     render_trace_chain,
@@ -97,6 +98,27 @@ def test_render_metric_series_spike_lifts_the_tail() -> None:
     healthy = render_metric_series(seeded_rng(3), **_series_kwargs(spike=1.0))
     spiked = render_metric_series(seeded_rng(3), **_series_kwargs(spike=10.0))
     assert spiked.p99 > healthy.p99
+
+
+def _flat_then_spike_kwargs() -> dict[str, object]:
+    return {
+        "service": "checkout",
+        "metric": "error_rate",
+        "unit": "errors/s",
+        "baseline": 0.4,
+        "baseline_window": TimeRange(start=-300, end=0),
+        "anomaly_window": TimeRange(start=0, end=300),
+        "spike": 20.0,
+    }
+
+
+def test_render_flat_then_spike_is_deterministic_and_shaped() -> None:
+    first = render_flat_then_spike(seeded_rng(11), **_flat_then_spike_kwargs())
+    second = render_flat_then_spike(seeded_rng(11), **_flat_then_spike_kwargs())
+    assert first == second
+    flat, spiked = first
+    assert flat.anomaly_window.end == spiked.anomaly_window.start  # adjacent windows tile
+    assert spiked.p99 > flat.p99 * 5  # the spike lifts the tail well above baseline
 
 
 # --- trace chain --------------------------------------------------------------
