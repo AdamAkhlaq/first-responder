@@ -10,8 +10,12 @@ in agent-visible signal).
 
 from __future__ import annotations
 
+import pytest
+
 from first_responder.schema.alert import Alert
 from first_responder.schema.ground_truth import GroundTruth
+from first_responder.schema.telemetry import LogEntry
+from first_responder.schema.time import Seconds
 from first_responder.simulator.store import TelemetryStore
 
 
@@ -39,3 +43,23 @@ def assert_no_verbatim_leak(store: TelemetryStore, alert: Alert, ground_truth: G
             f"eval-validity gate: ground-truth root cause leaked verbatim into "
             f"agent-visible text: {text!r}"
         )
+
+
+def assert_leak_guard_detects_planted_leak(
+    store: TelemetryStore,
+    alert: Alert,
+    ground_truth: GroundTruth,
+    *,
+    service: str,
+    t0: Seconds,
+) -> None:
+    """Prove the guard bites: plant the root cause into a log line and expect it to fail.
+
+    This is a self-test of :func:`assert_no_verbatim_leak` rather than of any one
+    scenario, so it lives here and every scenario exercises it the same way.
+    """
+    store.add_logs(
+        [LogEntry(timestamp=t0, service=service, level="error", message=ground_truth.root_cause)]
+    )
+    with pytest.raises(AssertionError, match="leaked verbatim"):
+        assert_no_verbatim_leak(store, alert, ground_truth)

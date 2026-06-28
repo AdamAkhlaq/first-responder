@@ -5,6 +5,6 @@ single ``import first_responder.simulator.scenarios`` makes them all resolvable 
 name through :func:`first_responder.simulator.scenario.get_scenario`.
 """
 
-from first_responder.simulator.scenarios import bad_deploy, cascading_timeout
+from first_responder.simulator.scenarios import bad_deploy, cascading_timeout, pool_exhaustion
 
-__all__ = ["bad_deploy", "cascading_timeout"]
+__all__ = ["bad_deploy", "cascading_timeout", "pool_exhaustion"]

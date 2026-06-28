@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
-from first_responder.schema.telemetry import LogEntry
 from first_responder.schema.time import TimeRange
 from first_responder.simulator.scenario import get_scenario
 from first_responder.simulator.scenarios.bad_deploy import (
@@ -13,7 +10,17 @@ from first_responder.simulator.scenarios.bad_deploy import (
     T0,
     UNRELATED_SERVICE,
 )
-from tests.simulator.leak_guard import assert_no_verbatim_leak
+from tests.simulator.leak_guard import (
+    assert_leak_guard_detects_planted_leak,
+    assert_no_verbatim_leak,
+)
+from tests.simulator.scenario_asserts import (
+    assert_activation_varies_by_seed,
+    assert_alert_states_symptom_not_cause,
+    assert_deterministic_activation,
+    error_logs,
+    series_by_onset,
+)
 
 SEED = 7
 _WIDE = TimeRange(start=T0 - 600, end=T0 + 600)
@@ -38,26 +45,11 @@ def test_ground_truth_contract() -> None:
 
 
 def test_activate_is_deterministic_for_a_seed() -> None:
-    first_store, first_alert = BAD_DEPLOY.activate(SEED)
-    second_store, second_alert = BAD_DEPLOY.activate(SEED)
-    assert first_store.metric_series(
-        AFFECTED_SERVICE, "error_rate", _WIDE
-    ) == second_store.metric_series(AFFECTED_SERVICE, "error_rate", _WIDE)
-    assert first_store.logs_for(AFFECTED_SERVICE) == second_store.logs_for(AFFECTED_SERVICE)
-    assert first_store.deploys() == second_store.deploys()
-    assert first_alert == second_alert
+    assert_deterministic_activation(BAD_DEPLOY, SEED)
 
 
 def test_activate_differs_across_seeds() -> None:
-    one, _ = BAD_DEPLOY.activate(1)
-    two, _ = BAD_DEPLOY.activate(2)
-    assert one.logs_for(AFFECTED_SERVICE) != two.logs_for(AFFECTED_SERVICE)
-
-
-def test_activate_returns_a_fresh_store_each_call() -> None:
-    a, _ = BAD_DEPLOY.activate(SEED)
-    b, _ = BAD_DEPLOY.activate(SEED)
-    assert a is not b
+    assert_activation_varies_by_seed(BAD_DEPLOY)
 
 
 # --- the core signal: spike onset aligns with the deploy ----------------------
@@ -73,8 +65,7 @@ def test_single_deploy_at_t0_for_affected_service() -> None:
 
 def test_error_rate_is_flat_then_spikes_at_t0() -> None:
     store, _ = BAD_DEPLOY.activate(SEED)
-    series = store.metric_series(AFFECTED_SERVICE, "error_rate", _WIDE)
-    by_onset = {s.anomaly_window.start: s for s in series}
+    by_onset = series_by_onset(store, AFFECTED_SERVICE, "error_rate", _WIDE)
     # A flat pre-incident window and the spiked incident window starting at T0.
     assert set(by_onset) == {T0 - 300, T0}
     flat, spike = by_onset[T0 - 300], by_onset[T0]
@@ -95,7 +86,7 @@ def test_symptom_onset_and_deploy_share_a_timestamp() -> None:
 
 def test_corroborating_error_logs_follow_the_onset() -> None:
     store, _ = BAD_DEPLOY.activate(SEED)
-    errors = store.logs_for(AFFECTED_SERVICE, filter=lambda e: e.level == "error")
+    errors = error_logs(store, AFFECTED_SERVICE)
     assert errors
     assert all(entry.timestamp >= T0 for entry in errors)
 
@@ -118,9 +109,9 @@ def test_red_herring_is_present_but_uncorrelated() -> None:
 
 def test_alert_describes_symptom_not_cause() -> None:
     _, alert = BAD_DEPLOY.activate(SEED)
-    assert alert.service == AFFECTED_SERVICE
-    assert alert.fired_at >= T0
-    assert "deploy" not in alert.symptom.lower()
+    assert_alert_states_symptom_not_cause(
+        alert, service=AFFECTED_SERVICE, t0=T0, forbidden=["deploy"]
+    )
 
 
 # --- the eval-validity gate ---------------------------------------------------
@@ -132,11 +123,7 @@ def test_no_verbatim_leak() -> None:
 
 
 def test_leak_guard_catches_a_planted_leak() -> None:
-    # Prove the guard works: plant the root cause verbatim into a log line.
     store, alert = BAD_DEPLOY.activate(SEED)
-    truth = BAD_DEPLOY.ground_truth()
-    store.add_logs(
-        [LogEntry(timestamp=T0, service=AFFECTED_SERVICE, level="error", message=truth.root_cause)]
+    assert_leak_guard_detects_planted_leak(
+        store, alert, BAD_DEPLOY.ground_truth(), service=AFFECTED_SERVICE, t0=T0
     )
-    with pytest.raises(AssertionError, match="leaked verbatim"):
-        assert_no_verbatim_leak(store, alert, truth)

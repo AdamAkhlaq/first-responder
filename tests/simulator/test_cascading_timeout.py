@@ -10,7 +10,16 @@ from first_responder.simulator.scenarios.cascading_timeout import (
     DOWNSTREAM_SERVICE,
     T0,
 )
-from tests.simulator.leak_guard import assert_no_verbatim_leak
+from tests.simulator.leak_guard import (
+    assert_leak_guard_detects_planted_leak,
+    assert_no_verbatim_leak,
+)
+from tests.simulator.scenario_asserts import (
+    assert_activation_varies_by_seed,
+    assert_alert_states_symptom_not_cause,
+    assert_deterministic_activation,
+    error_logs,
+)
 
 SEED = 13
 _WIDE = TimeRange(start=T0 - 600, end=T0 + 600)
@@ -35,20 +44,11 @@ def test_ground_truth_contract() -> None:
 
 
 def test_activate_is_deterministic_for_a_seed() -> None:
-    first_store, first_alert = CASCADING_TIMEOUT.activate(SEED)
-    second_store, second_alert = CASCADING_TIMEOUT.activate(SEED)
-    assert first_store.traces() == second_store.traces()
-    assert first_store.logs_for(AFFECTED_SERVICE) == second_store.logs_for(AFFECTED_SERVICE)
-    assert first_store.metric_series(
-        DOWNSTREAM_SERVICE, "latency_ms", _WIDE
-    ) == second_store.metric_series(DOWNSTREAM_SERVICE, "latency_ms", _WIDE)
-    assert first_alert == second_alert
+    assert_deterministic_activation(CASCADING_TIMEOUT, SEED)
 
 
 def test_activate_differs_across_seeds() -> None:
-    one, _ = CASCADING_TIMEOUT.activate(1)
-    two, _ = CASCADING_TIMEOUT.activate(2)
-    assert one.traces() != two.traces()
+    assert_activation_varies_by_seed(CASCADING_TIMEOUT)
 
 
 # --- the trace hop: A -> B, with B as the slow span ---------------------------
@@ -85,7 +85,7 @@ def test_downstream_b_latency_spikes_at_t0() -> None:
 
 def test_service_a_logs_show_timeouts_after_onset() -> None:
     store, _ = CASCADING_TIMEOUT.activate(SEED)
-    timeouts = store.logs_for(AFFECTED_SERVICE, filter=lambda e: e.level == "error")
+    timeouts = error_logs(store, AFFECTED_SERVICE)
     assert timeouts
     assert all(entry.timestamp >= T0 for entry in timeouts)
     assert all("timed out" in entry.message.lower() for entry in timeouts)
@@ -108,9 +108,9 @@ def test_service_a_health_metrics_look_normal() -> None:
 
 def test_alert_describes_symptom_not_cause() -> None:
     _, alert = CASCADING_TIMEOUT.activate(SEED)
-    assert alert.service == AFFECTED_SERVICE
-    assert alert.fired_at >= T0
-    assert DOWNSTREAM_SERVICE not in alert.symptom  # never names the downstream cause
+    assert_alert_states_symptom_not_cause(
+        alert, service=AFFECTED_SERVICE, t0=T0, forbidden=[DOWNSTREAM_SERVICE]
+    )
 
 
 # --- the eval-validity gate ---------------------------------------------------
@@ -119,3 +119,10 @@ def test_alert_describes_symptom_not_cause() -> None:
 def test_no_verbatim_leak() -> None:
     store, alert = CASCADING_TIMEOUT.activate(SEED)
     assert_no_verbatim_leak(store, alert, CASCADING_TIMEOUT.ground_truth())
+
+
+def test_leak_guard_catches_a_planted_leak() -> None:
+    store, alert = CASCADING_TIMEOUT.activate(SEED)
+    assert_leak_guard_detects_planted_leak(
+        store, alert, CASCADING_TIMEOUT.ground_truth(), service=AFFECTED_SERVICE, t0=T0
+    )
