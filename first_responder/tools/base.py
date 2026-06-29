@@ -35,6 +35,8 @@ from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict
 
+from first_responder.schema.time import TimeRange
+
 DataT = TypeVar("DataT")
 
 
@@ -68,3 +70,12 @@ class ToolResult(BaseModel, Generic[DataT]):
 # A tool is a pure function over a store: ``(store, **args) -> ToolResult``. The
 # registry holds these and ``dispatch`` binds the store to one at call time.
 Tool = Callable[..., ToolResult[Any]]
+
+
+def window_label(window: TimeRange) -> str:
+    """Render ``window`` as the half-open interval ``[start, end)`` for a finding.
+
+    Centralised so every tool describes a time window the same way — the agent and
+    the eval harness read one uniform grammar across all five tools' findings.
+    """
+    return f"[{window.start}, {window.end})"
