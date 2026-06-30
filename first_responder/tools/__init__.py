@@ -11,6 +11,6 @@ resolvable through :func:`first_responder.tools.registry.dispatch` — the same
 import-time registration convention the scenarios package uses.
 """
 
-from first_responder.tools import deploys, logs
+from first_responder.tools import deploys, logs, metrics
 
-__all__ = ["deploys", "logs"]
+__all__ = ["deploys", "logs", "metrics"]
